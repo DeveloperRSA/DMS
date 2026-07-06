@@ -1,0 +1,6 @@
+.next/
+node_modules/
+uploads/
+.env
+*.env.local
+prisma/migrations/

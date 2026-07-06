@@ -1,0 +1,98 @@
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  APPROVER
+  VIEWER
+}
+
+enum DocumentType {
+  INVOICE
+  CREDIT_NOTE
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WorkflowStep {
+  REVIEWER
+  MANAGER
+  FINANCE_ADMIN
+  COMPLETED
+}
+
+model User {
+  id           String            @id @default(uuid())
+  email        String            @unique
+  passwordHash String
+  name         String
+  role         Role              @default(VIEWER)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  AuditLogs    AuditLog[]
+  Approvals    ApprovalHistory[]
+}
+
+model Document {
+  id            String          @id @default(uuid())
+  type          DocumentType
+  storageUrl    String
+  fileHash      String          @unique
+  fileName      String
+  fileSize      Int
+  status        ApprovalStatus  @default(PENDING)
+  currentStep   WorkflowStep    @default(REVIEWER)
+  invoiceNumber String?
+  vendorName    String
+  documentDate  DateTime
+  amountExclVat Decimal         @db.Decimal(12, 2)
+  vatAmount     Decimal         @db.Decimal(12, 2)
+  amountInclVat Decimal         @db.Decimal(12, 2)
+  currency      String          @default("USD")
+  uploadedById  String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  approvals     ApprovalHistory[]
+  auditLogs     AuditLog[]
+
+  @@index([vendorName, amountInclVat])
+  @@index([documentDate, status])
+}
+
+model ApprovalHistory {
+  id         String         @id @default(uuid())
+  documentId String
+  document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  step       WorkflowStep
+  status     ApprovalStatus
+  userId     String
+  user       User           @relation(fields: [userId], references: [id])
+  comments   String?
+  actionedAt DateTime       @default(now())
+
+  @@unique([documentId, step])
+}
+
+model AuditLog {
+  id         String    @id @default(uuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  details    String
+  ipAddress  String?
+  createdAt  DateTime  @default(now())
+  documentId String?
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+}
